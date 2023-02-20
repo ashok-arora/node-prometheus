@@ -1,18 +1,29 @@
 const express = require("express");
-const app = express();
-const port = 3010;
+const prom_middleware = require("express-prometheus-middleware");
 const { MongoClient } = require("mongodb");
 require("dotenv").config();
 var axios = require("axios");
 
+const app = express();
+const port = 3010;
+
 // Connection URI
-const uri = "mongodb://rootuser:rootpass@localhost:27017";
+const uri = "mongodb://rootuser:rootpass@mongodb:27017";
 
 // Create a new MongoClient
 const client = new MongoClient(uri);
 
 const database = client.db("koinx");
 const collection = database.collection("transactions");
+
+app.use(
+  prom_middleware({
+    metricsPath: "/metrics",
+    collectDefaultMetrics: true,
+    requestLengthBuckets: [512, 1024, 5120, 10240, 51200, 102400],
+    responseLengthBuckets: [512, 1024, 5120, 10240, 51200, 102400],
+  })
+);
 
 async function check_connection() {
   try {
