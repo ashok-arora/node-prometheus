@@ -1,5 +1,11 @@
-# portainer
-# docker run -d -p 9000:9000 -v /var/run/docker.sock:/var/run/docker.sock -v portainer_data:/data portainer/portainer
+# Ports:
+## 9090: Prometheus - for scraping metrics
+## 3000: Grafana - for visualizing metrics
+## 3010: App - for serving the app
+## 8080: Mongo Express - for visualizing the database
+## 27017: MongoDB - for storing the database
+## 8000: Portainer - for managing the containers
+
 version: "3.3"
 services:
   portainer:
@@ -11,31 +17,30 @@ services:
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
       - "portainer_data:/data"
-    image: "portainer/portainer-ee:latest"
+    image: "portainer/portainer-ce:latest"
 
   prometheus:
     image: prom/prometheus:latest
-    # volumes:
-    #   - prometheus_data:/prometheus
-    #   - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-    # command:
-    #   - "--config.file=/etc/prometheus/prometheus.yml"
+    volumes:
+      - prometheus_data:/prometheus
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
     ports:
       - "9090:9090"
+    restart: always
 
   grafana:
     image: grafana/grafana:latest
-    # volumes:
-    #   - grafana_data:/var/lib/grafana
-    #   - ./grafana/provisioning:/etc/grafana/provisioning
-    #   - ./grafana/config.ini:/etc/grafana/config.ini
-    #   - ./grafana/dashboards:/var/lib/grafana/dashboards
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=illchangeitanyway
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/config.ini:/etc/grafana/config.ini
     depends_on:
       - prometheus
     ports:
       - "3000:3000"
+    restart: always
 
   mongodb:
     image: mongo
@@ -45,8 +50,7 @@ services:
     environment:
       - MONGO_INITDB_ROOT_USERNAME=rootuser
       - MONGO_INITDB_ROOT_PASSWORD=rootpass
-    volumes:
-      - mongodb-data
+    restart: always
 
   mongo-express:
     image: mongo-express
@@ -57,10 +61,17 @@ services:
       - ME_CONFIG_MONGODB_ADMINUSERNAME=rootuser
       - ME_CONFIG_MONGODB_ADMINPASSWORD=rootpass
       - ME_CONFIG_MONGODB_SERVER=mongodb
+    links:
+      - mongodb
+    restart: always
 
-networks:
-  default:
-    name: mongo-express-network
+  app:
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    ports:
+      - "3010:3010"
+    restart: always
 
 volumes:
   mongodb-data:
