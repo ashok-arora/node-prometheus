@@ -16,23 +16,34 @@ const collection = database.collection("transactions");
 
 async function check_connection() {
   try {
-    // Connect the client to the server (optional starting in v4.7)
     await client.connect();
-
     // Establish and verify connection
     await client.db("koinx").command({ ping: 1 });
     console.log("Connected successfully to server");
   } finally {
     // Ensures that the client will close when you finish/error
-    // await client.close();
+    await client.close();
   }
 }
 check_connection().catch(console.dir);
 
 async function insert_document(doc) {
   try {
-    const result = await collection.insertOne(doc);
-    console.log(`A document was inserted with the _id: ${result.insertedId}`);
+    client.connect();
+    const filter = { address: doc.address };
+    const new_doc = {
+      $set: {
+        transactions: doc.transactions,
+      },
+    };
+
+    // Create a document if one with the given `address` does not exist, upsert means update or insert
+    const options = { upsert: true };
+
+    const result = await collection.updateOne(filter, new_doc, options);
+    console.log(
+      `${result.matchedCount} document(s) matched the filter, updated ${result.modifiedCount} document(s)`
+    );
   } finally {
     await client.close();
   }
@@ -40,9 +51,7 @@ async function insert_document(doc) {
 
 app.get("/", (req, res) => {
   console.log("GET /");
-  //   console.log("Active connections: " + active_connections);
   if (!req.query.address) {
-    // const err = new Error("Error: User address missing. ");
     res.status(400).send("Error: User address missing. ");
   }
 
@@ -62,23 +71,12 @@ app.get("/", (req, res) => {
         address: req.query.address,
         transactions: response.data["result"],
       };
-      const transactions = response.data["result"];
-      client.connect();
-      const existing_address = database
-        .collection("users")
-        .findOne({ address: req.query.address });
-      if (existing_address && existing_address.length > 0) {
-        console.log("Address already exists");
-      } else {
-        insert_document(doc).catch(console.dir);
-      }
-      res.send(JSON.stringify(transactions));
+      insert_document(doc).catch(console.dir);
+      res.send(JSON.stringify(response.data["result"]));
     })
     .catch(function (error) {
       res.send(error);
     });
-
-  //   res.send(process.env.ETHERSCAN_APIKEY);
 });
 
 app.listen(port, () => {
